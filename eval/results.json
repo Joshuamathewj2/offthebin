@@ -1,11 +1,11 @@
 {
-  "at": "2026-10-21T07:15:55.720Z",
+  "at": "2026-10-21T09:02:52.234Z",
   "radiusM": 10000,
   "rows": [
     {
       "city": "Chennai, IN",
       "n": 1,
-      "possible": 3,
+      "possible": 2,
       "withHours": 100,
       "parsableHours": 100,
       "staleOver3y": 100,
@@ -20,7 +20,7 @@
     {
       "city": "Mumbai, IN",
       "n": 0,
-      "possible": 11,
+      "possible": 0,
       "withHours": 0,
       "parsableHours": 0,
       "staleOver3y": 0,
@@ -35,7 +35,7 @@
     {
       "city": "Brisbane, AU",
       "n": 0,
-      "possible": 32,
+      "possible": 12,
       "withHours": 0,
       "parsableHours": 0,
       "staleOver3y": 0,
@@ -50,9 +50,9 @@
     {
       "city": "London, UK",
       "n": 23,
-      "possible": 220,
+      "possible": 17,
       "withHours": 35,
-      "parsableHours": 17,
+      "parsableHours": 22,
       "staleOver3y": 17,
       "medianAgeYears": 1.5,
       "naiveLowConf": 1,
@@ -65,7 +65,7 @@
     {
       "city": "New York, US",
       "n": 1,
-      "possible": 78,
+      "possible": 16,
       "withHours": 0,
       "parsableHours": 0,
       "staleOver3y": 100,
@@ -80,9 +80,9 @@
     {
       "city": "Berlin, DE",
       "n": 8,
-      "possible": 812,
+      "possible": 13,
       "withHours": 50,
-      "parsableHours": 25,
+      "parsableHours": 38,
       "staleOver3y": 13,
       "medianAgeYears": 2,
       "naiveLowConf": 2,
@@ -95,7 +95,7 @@
     {
       "city": "Nairobi, KE",
       "n": 5,
-      "possible": 663,
+      "possible": 13,
       "withHours": 0,
       "parsableHours": 0,
       "staleOver3y": 80,
@@ -110,7 +110,7 @@
     {
       "city": "Sao Paulo, BR",
       "n": 1,
-      "possible": 45,
+      "possible": 35,
       "withHours": 0,
       "parsableHours": 0,
       "staleOver3y": 100,

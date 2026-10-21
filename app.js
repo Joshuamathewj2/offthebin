@@ -254,7 +254,7 @@
     const ok = ev.rows.filter(r => !r.error);
     const sum = k => ok.reduce((a, r) => a + r[k], 0);
     const empty = ok.filter(r => r.n === 0).length, rescued = ok.filter(r => r.n === 0 && r.possible > 0).length;
-    $('stat').textContent = `Measured in ${ok.length} cities: ${empty} have zero battery drop-offs tagged on the map (${rescued} gain unconfirmed candidates), and ${sum('naiveStale')} of the ${sum('naiveTop3')} nearest listings are 3+ years old.`;
+    $('stat').textContent = `Measured in ${ok.length} cities: ${empty} have zero places tagged as taking batteries within 10 km (${rescued} of them have unconfirmed recycling centres nearby), and ${sum('naiveStale')} of the ${sum('naiveTop3')} nearest listings are 3+ years old.`;
   } catch (e) { $('stat').remove(); }
 
   const h = location.hash.slice(1);
