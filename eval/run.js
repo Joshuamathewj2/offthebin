@@ -11,16 +11,19 @@ const CITIES = [
 ];
 const RADIUS = 10000;
 const UA = { 'User-Agent': 'OffTheBin-eval/1.0 (hackathon project)' };
-const NOW = new Date(Date.now());
+const NOW = new Date(Date.now()); // overwritten with the saved run time in --report mode
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const pct = (n, d) => (d ? Math.round((100 * n) / d) : 0);
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
 
 const fetchUA = (u, o) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...UA } });
 
+// --report rebuilds RESULTS.md from the saved results.json without querying Overpass again.
+const REPORT_ONLY = process.argv.includes('--report');
+
 (async () => {
   const rows = [];
-  for (const [name, lat, lon] of CITIES) {
+  for (const [name, lat, lon] of REPORT_ONLY ? [] : CITIES) {
     let sites;
     for (let i = 0; i < 3 && !sites; i++) {
       try { sites = await OTB.fetchSites(['recycling:batteries'], lat, lon, RADIUS, fetchUA, false, 150000); }
@@ -52,7 +55,11 @@ const fetchUA = (u, o) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...U
     console.log(name, rows[rows.length - 1]);
     await sleep(2500);
   }
-  fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({ at: NOW.toISOString(), radiusM: RADIUS, rows }, null, 2));
+  if (REPORT_ONLY) {
+    const saved = JSON.parse(fs.readFileSync(path.join(__dirname, 'results.json'), 'utf8'));
+    rows.push(...saved.rows);
+    NOW.setTime(new Date(saved.at).getTime());
+  } else fs.writeFileSync(path.join(__dirname, 'results.json'), JSON.stringify({ at: NOW.toISOString(), radiusM: RADIUS, rows }, null, 2));
 
   const ok = rows.filter(r => !r.error);
   const tot = k => ok.reduce((a, r) => a + r[k], 0);
@@ -61,7 +68,22 @@ const fetchUA = (u, o) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...U
   for (const r of rows) md += r.error ? `| ${r.city} | fetch failed | | | | | | | | | |\n`
     : `| ${r.city} | ${r.n} | ${r.possible} | ${r.withHours}% | ${r.parsableHours}% | ${r.staleOver3y}% | ${r.medianAgeYears ?? '-'} | ${r.naiveLowConf}/${r.naiveTop3} | ${r.naiveStale}/${r.naiveTop3} | ${r.topLowConf}/${r.top3} | ${r.topStale}/${r.top3} |\n`;
   md += `\n**Coverage:** ${ok.filter(r => r.n === 0).length} of ${ok.length} cities have zero drop-offs explicitly tagged as taking batteries within ${RADIUS / 1000} km; ${ok.filter(r => r.n === 0 && r.possible > 0).length} of those gain unconfirmed candidates (general recycling centres) from the fallback tier.\n\n**Ranking, across ${ok.length} cities:** nearest-3 results were low-confidence ${tot('naiveLowConf')}/${tot('naiveTop3')} times and stale ${tot('naiveStale')}/${tot('naiveTop3')} times; after OffTheBin re-ranking: ${tot('topLowConf')}/${tot('top3')} and ${tot('topStale')}/${tot('top3')}.\n\n`;
-  md += `## Honest limits\n- "Stale" means the OSM record was not edited for 3+ years. That is a risk signal, not proof the site closed.\n- Confidence is a heuristic (freshness, listed hours, contact info, access, edit history), not validated against phone-call ground truth. Calling 30 sites to calibrate it is the next step.\n- OSM coverage differs a lot by city; low counts mean missing data, not missing services.\n- Opening hours with public-holiday or seasonal rules are reported as "hours unknown" instead of guessed.\n`;
+  // Before/after against the first evaluation (kept in results.before.json). Its "unconfirmed" column used a
+  // since-removed tier that counted ordinary bins (amenity=waste_disposal), so that column is not comparable.
+  const beforeFile = path.join(__dirname, 'results.before.json');
+  if (fs.existsSync(beforeFile)) {
+    const b = JSON.parse(fs.readFileSync(beforeFile, 'utf8'));
+    const bOk = b.rows.filter(r => !r.error);
+    const bt = k => bOk.reduce((a, r) => a + (r[k] || 0), 0);
+    md += `## Before / after (first run ${b.at.slice(0, 10)} vs this run)\nChanges in between: parser handles date closures and \`PH off\`; \`check_date\` counts as a survey; unconfirmed tier limited to recycling centres. OSM data itself also changes between runs.\n\n`;
+    md += `| City | Drop-offs (before → after) | Hours we can parse | Not edited 3+ yrs |\n|---|---|---|---|\n`;
+    for (const r of ok) {
+      const p = bOk.find(x => x.city === r.city);
+      md += p ? `| ${r.city} | ${p.n} → ${r.n} | ${p.parsableHours}% → ${r.parsableHours}% | ${p.staleOver3y}% → ${r.staleOver3y}% |\n` : `| ${r.city} | - → ${r.n} | - → ${r.parsableHours}% | - → ${r.staleOver3y}% |\n`;
+    }
+    md += `\n| Across cities | Before | After |\n|---|---|---|\n| Nearest-3 low-confidence | ${bt('naiveLowConf')}/${bt('naiveTop3')} | ${tot('naiveLowConf')}/${tot('naiveTop3')} |\n| OffTheBin top-3 low-confidence | ${bt('topLowConf')}/${bt('top3')} | ${tot('topLowConf')}/${tot('top3')} |\n| Nearest-3 stale | ${bt('naiveStale')}/${bt('naiveTop3')} | ${tot('naiveStale')}/${tot('naiveTop3')} |\n| OffTheBin top-3 stale | ${bt('topStale')}/${bt('top3')} | ${tot('topStale')}/${tot('top3')} |\n\n`;
+  }
+  md += `## Honest limits\n- "Stale" means the OSM record was not edited or surveyed for 3+ years. That is a risk signal, not proof the site closed.\n- Confidence is a rule-based score (freshness, listed hours, contact info, access, edit history) whose weights were set by hand. Whether it predicts reality is tested separately in [ground-truth/](ground-truth/).\n- Re-ranking can only choose among the listings that exist: in cities with 0-1 listings it cannot help, which is why the project's main lever is adding data (see docs/MAPPING_GUIDE_CHENNAI.md).\n- OSM coverage differs a lot by city; low counts mean missing data, not missing services.\n- Hours with seasonal or public-holiday-specific times are reported as "hours unknown" instead of guessed.\n`;
   fs.writeFileSync(path.join(__dirname, 'RESULTS.md'), md);
   console.log('\n' + md);
 })();

@@ -76,7 +76,14 @@
     try { live = await OTB.fetchSites(it.keys, here.lat, here.lon, 25000, undefined, true, 60000); } catch (e) {}
     $('go').disabled = false;
     if (my !== token) return;
-    if (live) show(it, card, live, 25000, { kind: 'live' });
+    if (live && snap && document.querySelector('.report:not([hidden])')) {
+      // Don't wipe a report someone is writing; let them switch when ready.
+      const bar = document.createElement('div');
+      bar.className = 'warn';
+      bar.innerHTML = 'Live data is ready. <button class="linkbtn" type="button">Show live data</button>';
+      bar.querySelector('button').onclick = () => show(it, card, live, 25000, { kind: 'live' });
+      $('out').querySelector('section.panel:not(.item)')?.prepend(bar);
+    } else if (live) show(it, card, live, 25000, { kind: 'live' });
     else if (snap) show(it, card, snap.all, snap.radiusM, { kind: 'cached', savedAt: snap.savedAt, refreshing: false });
     else $('out').innerHTML = card + '<div class="panel">The public map server is overloaded and there is no saved copy for this area yet. Please try again in a minute.</div>';
   }
@@ -125,6 +132,7 @@
 
   function render(it, card, ranked, radius, source) {
     const shown = ranked.slice(0, 8);
+    lastShown = shown;
     const km = radius / 1000;
     let html = card;
     if (!shown.length) {
@@ -170,9 +178,60 @@
         <div class="meta">Why this score: ${esc(reasons(s))}</div>
         <div class="links"><a href="https://www.openstreetmap.org/directions?to=${s.lat}%2C${s.lon}" target="_blank" rel="noopener">Directions</a>
           ${phone ? `<a href="tel:${esc(phone)}">Call</a>` : ''}${web && /^https?:/.test(web) ? `<a href="${esc(web)}" target="_blank" rel="noopener">Website</a>` : ''}
-          <a href="https://www.openstreetmap.org/edit?${type}=${id}" target="_blank" rel="noopener">Fix this listing</a></div></div>
+          <a href="https://www.openstreetmap.org/edit?${type}=${id}" target="_blank" rel="noopener">Fix this listing</a>
+          <button class="linkbtn" type="button" data-report="${i}">Report a problem</button></div>
+        <div class="report" id="report-${i}" hidden></div></div>
       <div class="conf"><strong>${lab}</strong><div class="meta">${s.conf}/100</div><div class="bar ${level}"><i style="width:${s.conf}%"></i></div></div>
     </article>`;
+  }
+
+  // ---- Report a problem: anonymous OpenStreetMap Note at the site, so local mappers can fix the data. ----
+  // ?osm=dev sends to the OSM development server instead (for testing without touching the real map).
+  const NOTES_API = /[?&]osm=dev\b/.test(location.search) ? 'https://master.apis.dev.openstreetmap.org' : 'https://api.openstreetmap.org';
+  const REASONS = {
+    closed: 'This place has closed or moved.',
+    refuses: 'This place does not accept ITEM.',
+    hours: 'The opening hours shown are wrong.',
+    confirmed: 'Confirmed: this place accepts ITEM.',
+  };
+  let lastShown = [];
+  function noteText(s, reason, extra) {
+    const [type, id] = s.id.split('/');
+    return [`${REASONS[reason].replace('ITEM', current.name.split(' (')[0].toLowerCase())}`, extra && extra.trim() ? `Details: ${extra.trim().slice(0, 500)}` : '',
+      `Place: ${s.name} (https://www.openstreetmap.org/${type}/${id})`, `Reported via OffTheBin on ${new Date().toISOString().slice(0, 10)}. #OffTheBin`].filter(Boolean).join('\n');
+  }
+  $('out').addEventListener('click', async e => {
+    const open = e.target.closest('[data-report]');
+    if (open) {
+      const i = +open.dataset.report, box = $('report-' + i);
+      box.hidden = !box.hidden;
+      if (!box.hidden && !box.innerHTML) {
+        box.innerHTML = `<fieldset><legend>What's wrong?</legend>${Object.entries(REASONS).map(([k, v], n) => `<label><input type="radio" name="r${i}" value="${k}" ${n ? '' : 'checked'}> ${esc(v.replace('ITEM', 'this item'))}</label>`).join('')}</fieldset>
+          <label for="x${i}" class="meta">Details (optional, public)</label><input type="text" id="x${i}" maxlength="500" placeholder="e.g. new address, or the hours on the board">
+          <pre class="preview" aria-live="polite"></pre>
+          <button class="btn" type="button" data-send="${i}">Post public note to OpenStreetMap</button>
+          <p class="hint">Notes are public and anonymous. Volunteers who edit the map near this place see them. Don't include personal details.</p>`;
+      }
+      if (!box.hidden) preview(i);
+      return;
+    }
+    const send = e.target.closest('[data-send]');
+    if (!send) return;
+    const i = +send.dataset.send, s = lastShown[i], box = $('report-' + i);
+    send.disabled = true; send.textContent = 'Sending…';
+    try {
+      const body = new URLSearchParams({ lat: s.lat, lon: s.lon, text: noteText(s, box.querySelector('input[type=radio]:checked').value, $('x' + i).value) });
+      const r = await fetch(NOTES_API + '/api/0.6/notes.json', { method: 'POST', body });
+      if (!r.ok) throw new Error(r.status);
+      const n = await r.json();
+      box.innerHTML = `<p class="ok">Thanks! Note <a href="${NOTES_API.replace('//api.', '//www.')}/note/${n.properties.id}" target="_blank" rel="noopener">#${n.properties.id}</a> is on the map for local mappers.</p>`;
+    } catch (err) { send.disabled = false; send.textContent = 'Post public note to OpenStreetMap'; box.querySelector('.hint').textContent = 'Could not reach OpenStreetMap. Please try again.'; }
+  });
+  $('out').addEventListener('input', e => { const m = e.target.closest('.report'); if (m) preview(+m.id.split('-')[1]); });
+  $('out').addEventListener('change', e => { const m = e.target.closest('.report'); if (m) preview(+m.id.split('-')[1]); });
+  function preview(i) {
+    const box = $('report-' + i);
+    box.querySelector('.preview').textContent = noteText(lastShown[i], box.querySelector('input[type=radio]:checked').value, $('x' + i).value);
   }
 
   function drawMap(shown) {

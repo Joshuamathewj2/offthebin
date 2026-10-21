@@ -37,12 +37,19 @@ async function osm(url) {
     const accepts = Object.keys(t).filter(k => KEYS.has(k) && t[k] === 'yes');
     out.push({ ...r, onMap: !!e, checkDate: t.check_date || '', accepts, verified: !!e && !!t.check_date && accepts.length > 0 });
   }
+  // User reports sent from the app (anonymous OSM Notes tagged #OffTheBin), and how many mappers resolved.
+  let notes = [];
+  try {
+    const r = await fetch('https://api.openstreetmap.org/api/0.6/notes/search.json?q=%23OffTheBin&closed=-1&limit=1000', { headers: UA });
+    if (r.ok) notes = (await r.json()).features.filter(f => /#OffTheBin/.test(f.properties.comments[0]?.text || ''));
+  } catch (e) {}
   const verified = out.filter(r => r.verified);
   const byOutcome = o => out.filter(r => r.outcome === o).length;
   const battery = verified.filter(r => r.accepts.some(k => /batter/.test(k))).length;
   let md = `# Impact log (checked against live OpenStreetMap ${new Date().toISOString().slice(0, 10)})\n\n`;
   md += `- Targets surveyed: **${out.length}** of 20\n- Verified on the map (record exists, has check_date, accepts an OffTheBin material): **${verified.length}**\n`;
-  md += `- Of those, taking household or car batteries: **${battery}**\n- Added new: ${byOutcome('added')} · updated existing: ${byOutcome('updated')} · zone said no centre: ${byOutcome('no centre')} · does not take these items: ${byOutcome('does not take')}\n\n`;
+  md += `- Of those, taking household or car batteries: **${battery}**\n- Added new: ${byOutcome('added')} · updated existing: ${byOutcome('updated')} · zone said no centre: ${byOutcome('no centre')} · does not take these items: ${byOutcome('does not take')}\n`;
+  md += `- Problem reports filed from the app (public OSM Notes tagged #OffTheBin): **${notes.length}**, of which resolved by mappers: **${notes.filter(n => n.properties.status === 'closed').length}**\n\n`;
   md += `| Target | Date | Outcome | On map | check_date | Accepts (from OSM) |\n|---|---|---|---|---|---|\n`;
   md += out.map(r => `| ${r.target} | ${r.date} | ${r.outcome} | ${r.onMap ? `[yes](${r.osm_url})` : 'no'} | ${r.checkDate} | ${r.accepts.map(k => k.replace('recycling:', '')).join(', ')} |`).join('\n') + '\n';
   fs.writeFileSync(path.join(__dirname, 'IMPACT.md'), md);
