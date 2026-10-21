@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OffTheBin: where hazardous waste can actually go</title>
+<meta name="description" content="Batteries, e-waste, bulbs and oil must never go in the bin. Find a drop-off that is likely open, with an honest confidence score for every listing.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1d2a24;--mute:#5e6b64;--line:#e2ded2;--green:#1f7a4d;--green-d:#14583a;--amber:#b86e00;--red:#b3261e;--fire:#d6402a;--chip:#ebe7da}
+@media (prefers-color-scheme:dark){:root{--bg:#121714;--card:#1a211d;--ink:#e8eee9;--mute:#95a49b;--line:#2b352f;--green:#4cc38a;--green-d:#7fe0b0;--amber:#f0a73a;--red:#ff7b72;--fire:#ff6a4f;--chip:#242d28}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px 56px}
+header{padding:28px 0 8px}
+h1{font-size:clamp(26px,5vw,38px);margin:0 0 6px;letter-spacing:-.02em}
+h1 span{color:var(--green)}
+.lede{color:var(--mute);margin:0;max-width:62ch}
+.stat{display:inline-block;margin-top:12px;padding:6px 12px;border-radius:999px;background:var(--chip);font-size:14px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:16px}
+label{font-weight:600;font-size:14px;display:block;margin-bottom:6px}
+input[type=text]{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,button:focus-visible,a:focus-visible,.chip:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:999px;padding:7px 12px;font:inherit;font-size:14px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--green);color:#fff;border-color:var(--green)}
+.btn{background:var(--green);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:600;cursor:pointer}
+.btn.alt{background:var(--chip);color:var(--ink)}
+.btn:disabled{opacity:.6;cursor:wait}
+.inline{display:flex;gap:8px}
+.hint{color:var(--mute);font-size:13px;margin:6px 0 0}
+.item{border-left:6px solid var(--green)}
+.item.fire{border-left-color:var(--fire)}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--chip);margin-right:6px}
+.tag.fire{background:var(--fire);color:#fff}.tag.toxic{background:var(--amber);color:#fff}
+.item h2{margin:6px 0}
+.item ul{margin:6px 0 0;padding-left:20px}
+#map{height:340px;border-radius:12px;margin-top:16px;border:1px solid var(--line)}
+.site{display:grid;grid-template-columns:1fr auto;gap:8px 16px;padding:14px 0;border-top:1px solid var(--line)}
+.site:first-child{border-top:0}
+.site h3{margin:0;font-size:17px}
+.meta{color:var(--mute);font-size:14px}
+.open{font-weight:700}.open.y{color:var(--green)}.open.n{color:var(--red)}.open.u{color:var(--mute)}
+.conf{min-width:130px;text-align:right}
+.bar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--green)}
+.bar.mid i{background:var(--amber)}.bar.low i{background:var(--red)}
+.links a{margin-right:14px;font-size:14px;color:var(--green-d)}
+.warn{background:var(--chip);border-radius:10px;padding:12px;margin-top:12px}
+.sr{position:absolute;left:-9999px}
+footer{color:var(--mute);font-size:13px;margin-top:28px}
+a{color:var(--green-d)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Off<span>The</span>Bin</h1>
+    <p class="lede">Batteries, e-waste, bulbs and oil should never go in the bin. Pick what you are holding and get the nearest drop-off, scored for how much you should trust the listing before you drive there.</p>
+    <span class="stat" id="stat">Loading evaluation…</span>
+  </header>
+
+  <section class="panel" aria-label="Search">
+    <div class="row">
+      <div>
+        <label for="q">What are you holding?</label>
+        <input id="q" type="text" placeholder="e.g. power bank, tube light, paint" autocomplete="off" list="suggest">
+        <datalist id="suggest"></datalist>
+        <div class="chips" id="chips" role="group" aria-label="Common items"></div>
+      </div>
+      <div>
+        <label for="place">Where are you?</label>
+        <div class="inline">
+          <input id="place" type="text" placeholder="City or area" autocomplete="off">
+          <button class="btn" id="go">Search</button>
+        </div>
+        <p class="hint"><button class="btn alt" id="geo" type="button">Use my location</button> Your location stays in your browser and is only sent to OpenStreetMap services.</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="out" aria-live="polite"></div>
+
+  <footer>
+    Data: © OpenStreetMap contributors (ODbL), via Overpass. Safety guidance summarised from linked US EPA pages; local rules vary, so call ahead for fire-risk items. <a href="https://github.com/">Source and evaluation</a> are in the repository (eval/RESULTS.md).
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="lib.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
