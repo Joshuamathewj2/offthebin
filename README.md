@@ -23,8 +23,8 @@ Batteries, e-waste, tube lights, paint and oil can't go in household bins. Lithi
 | What | Where | Status |
 |---|---|---|
 | Coverage and staleness in 8 cities | [eval/RESULTS.md](eval/RESULTS.md) (`node eval/run.js`) | done |
-| Does the trust score predict reality? 30 sites, blind-checked | [eval/ground-truth/](eval/ground-truth/) (`node eval/groundtruth.js score`) | **in progress** |
-| Drop-off points added to OSM in Chennai, verified from live OSM | [eval/IMPACT.md](eval/IMPACT.md) (`node eval/impact.js`) | **in progress** |
+| Does the trust score predict reality? 20 of 30 sites checked blind against official sources | [eval/ground-truth/RESULTS.md](eval/ground-truth/RESULTS.md) (`node eval/groundtruth.js score`) | done: weak signal (below) |
+| Drop-off points added to OSM in Chennai, verified from live OSM | [eval/IMPACT.md](eval/IMPACT.md) (`node eval/impact.js`) | tracker ready; field survey starts after the hackathon |
 | Unit tests (hours parser, scoring, ranking, query) | `node --test` | 10/10 passing |
 
 ## Run it
@@ -43,7 +43,7 @@ node eval/snapshot.js     # refresh saved city data (delete a file to refresh it
 - `eval/` evaluation, snapshots, ground-truth worksheet and scorer, impact checker · `test/` unit tests
 
 ## Limits
-- The trust score is rule-based and its weights were set by hand. Whether it predicts reality is being tested now (above), and until that check is done we don't claim it does.
+- The trust score is rule-based and its weights were set by hand. In the ground-truth check, all 15 high-score sites (65+) were confirmed by official sources; of the 5 low-score sites (under 40) that could be verified at all, 4 were valid and 1 was wrong (a vans-only transfer station). The other 10 low-score sites, mostly unnamed bins, couldn't be verified from any public source. So the score reliably marks listings you can trust and confirm; it is a weak predictor of whether a low-score listing is actually wrong (Fisher p = 0.25, n = 20). We show it as a guide, not a verdict.
 - OpenStreetMap coverage varies hugely; the app reports gaps rather than hiding them.
 - Public-holiday closures can't be known offline; hours tagged `PH off` show a note.
 - Safety guidance is general (US EPA / EU sources); local rules can differ, so call ahead for fire-risk items.

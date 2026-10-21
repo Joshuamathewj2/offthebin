@@ -9,7 +9,7 @@ Batteries, e-waste, tube lights, paint and oil must never go in a household bin.
 ## What we measured (8 cities, OpenStreetMap, reproducible with `node eval/run.js`)
 - **Gaps:** Mumbai and Brisbane: 0 places tagged as taking batteries within 10 km of the centre. Chennai, New York, São Paulo: 1 each. See [eval/RESULTS.md](eval/RESULTS.md).
 - **Staleness:** of the nearest-3 battery drop-offs across all cities, **6 of 12 had not been edited for 3+ years**.
-- **Trust score vs reality:** **PENDING** (30 sites, 15 high / 15 low score, checked blind by phone, website or Street View) → [eval/ground-truth/RESULTS.md](eval/ground-truth/RESULTS.md)
+- **Trust score vs reality** (30 sites sampled, 15 high / 15 low score, checked blind against council, BSR and retailer websites) → [eval/ground-truth/RESULTS.md](eval/ground-truth/RESULTS.md): **all 15 high-score sites were confirmed by an official source.** Only 5 of the 15 low-score sites could be verified at all (4 valid, 1 wrong). The other 10 had no public trace. Honest read: the score reliably identifies listings you can trust; it is a weak signal for spotting wrong ones (p = 0.25). That is why the data-repair loop matters.
 
 ## What we built
 1. Item-first safety guidance (hazard, prep, never-in), with sources.
@@ -19,14 +19,14 @@ Batteries, e-waste, tube lights, paint and oil must never go in a household bin.
 5. **Data repair loop:** *Report a problem* on every result turns a user's "this place closed" into an anonymous public OpenStreetMap Note for local mappers (no account); *Fix this listing* for mappers; a 20-target survey guide for Chennai; a script that counts contributions from live OSM.
 
 ## Impact evidence
-- **PENDING:** "Added N verified drop-off points to OpenStreetMap in Chennai" (from `node eval/impact.js`, checked against live OSM, each with `check_date`).
+- **Ready, not yet run:** the Chennai field survey (20 targets, [docs/MAPPING_GUIDE_CHENNAI.md](docs/MAPPING_GUIDE_CHENNAI.md)) and the tracker that counts results from live OSM (`node eval/impact.js` → [eval/IMPACT.md](eval/IMPACT.md)). We report 0 contributions so far rather than claim any.
 - Anything added to OSM is open data: it reaches every app and map that uses OpenStreetMap, not just this one.
 
 ## Feasibility
 Static site on GitHub Pages: no backend, no API keys, zero running cost. Works in any city OpenStreetMap covers. The data improves as people use *Fix this listing*.
 
 ## Honest limits
-- The score's weights are hand-set; the claim stands or falls on the ground-truth check above.
+- The score's weights are hand-set, and the ground-truth check (above) shows a weak signal, not a proven predictor. 3 of the 20 checks rely on a chain-wide take-back policy plus the store still trading, rather than a sighting of the bin itself.
 - The official Tamil Nadu recycler directory can't be redistributed (its licence forbids reproduction), so we link to it instead of importing it.
 - OSM coverage in India is thin; that gap is the reason for the mapping work, not a footnote.
 

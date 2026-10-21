@@ -124,7 +124,9 @@ function score() {
     : gap >= 10 ? 'WEAK SIGNAL: keep the score as a supporting feature; lead with coverage gap + data repair.'
     : 'SCORE DOES NOT PREDICT VALIDITY: kill it as the headline; pivot to coverage gap + data repair.';
   const sources = Object.entries(done.reduce((o, r) => ({ ...o, [r.source || 'unspecified']: (o[r.source || 'unspecified'] || 0) + 1 }), {})).map(([k, v]) => `${k} ${v}`).join(', ');
-  let md = `# Ground truth: does the confidence score predict reality?\n\nChecked ${done.length}/${rows.length} sites (${sources}). "Valid" = the place takes household batteries today.\n\n`;
+  const unchecked = b => rows.filter(r => r.band === b && !yn(r.takes_batteries_today)).length;
+  let md = `# Ground truth: does the confidence score predict reality?\n\nChecked ${done.length}/${rows.length} sites (${sources}). "Valid" = the place takes household batteries today.\n`;
+  md += `Could not be verified from public sources: ${unchecked('high')} of the ${HIGH}+ band, ${unchecked('low')} of the under-${LOW} band.\n\n`;
   md += `| Band | Checked | Valid | % valid |\n|---|---|---|---|\n| Score ${HIGH}+ | ${h.length} | ${valid(h)} | ${pct(valid(h), h.length)}% |\n| Score under ${LOW} | ${l.length} | ${valid(l)} | ${pct(valid(l), l.length)}% |\n\n`;
   md += `**Headline:** sites scored ${HIGH}+: ${pct(valid(h), h.length)}% verified correct; sites under ${LOW}: ${pct(valid(l), l.length)}% (Fisher exact p = ${p.toFixed(3)}, n = ${done.length}).\n\n**Verdict:** ${verdict}\n\n`;
   const bad = done.filter(r => yn(r.takes_batteries_today) === 'N');
