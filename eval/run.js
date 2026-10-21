@@ -23,14 +23,14 @@ const fetchUA = (u, o) => fetch(u, { ...o, headers: { ...(o.headers || {}), ...U
   for (const [name, lat, lon] of CITIES) {
     let sites;
     for (let i = 0; i < 3 && !sites; i++) {
-      try { sites = await OTB.fetchSites(['recycling:batteries'], lat, lon, RADIUS, fetchUA); }
+      try { sites = await OTB.fetchSites(['recycling:batteries'], lat, lon, RADIUS, fetchUA, false, 150000); }
       catch (e) { await sleep(5000); }
     }
     if (!sites) { rows.push({ city: name, error: true }); continue; }
     await sleep(2500);
     let withPossible = [];
     for (let i = 0; i < 3 && !withPossible.length; i++) {
-      try { withPossible = await OTB.fetchSites(['recycling:batteries'], lat, lon, RADIUS, fetchUA, true); break; }
+      try { withPossible = await OTB.fetchSites(['recycling:batteries'], lat, lon, RADIUS, fetchUA, true, 150000); break; }
       catch (e) { await sleep(5000); }
     }
     const possible = withPossible.filter(s => s.tier === 'possible').length;

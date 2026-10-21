@@ -4,12 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const OTB = require('../lib.js');
 
+// Demo cities first (home city, well-mapped, medium, gap), then the rest of the eval set.
 const CITIES = [
-  ['Chennai', 13.0827, 80.2707], ['Mumbai', 19.076, 72.8777], ['Brisbane', -27.4698, 153.0251],
-  ['London', 51.5074, -0.1278], ['New York', 40.7128, -74.006], ['Berlin', 52.52, 13.405],
-  ['Nairobi', -1.2921, 36.8219], ['Sao Paulo', -23.5505, -46.6333],
+  ['Chennai', 13.0827, 80.2707], ['London', 51.5074, -0.1278], ['Berlin', 52.52, 13.405], ['Mumbai', 19.076, 72.8777],
+  ['Brisbane', -27.4698, 153.0251], ['New York', 40.7128, -74.006], ['Nairobi', -1.2921, 36.8219], ['Sao Paulo', -23.5505, -46.6333],
 ];
-const RADIUS = 30000;
+const RADIUS = 20000;
+const TIMEOUT_MS = 180000; // public Overpass queues requests for 30-40 s even for tiny queries
 const DIR = path.join(__dirname, '..', 'data', 'snapshots');
 const items = require('../data/items.json');
 const keys = [...new Set(items.flatMap(i => i.keys))];
@@ -25,7 +26,7 @@ const fetchUA = (u, o) => fetch(u, { ...o, headers: { ...(o.headers || {}), 'Use
     if (!fs.existsSync(out)) {
       let sites;
       for (let i = 0; i < 5 && !sites; i++) {
-        try { sites = await OTB.fetchSites(keys, lat, lon, RADIUS, fetchUA, true); }
+        try { sites = await OTB.fetchSites(keys, lat, lon, RADIUS, fetchUA, true, TIMEOUT_MS); }
         catch (e) { console.log(name, 'attempt', i + 1, 'failed:', e.message); await sleep(15000 * (i + 1)); }
       }
       if (!sites) { console.log(name, 'SKIPPED'); continue; }

@@ -2,7 +2,7 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const items = await (await fetch('data/items.json')).json();
-  let current = null, here = null, map = null, layer = null;
+  let current = null, here = null, map = null, scrollPending = false;
 
   // ---- item picker ----
   $('suggest').innerHTML = items.map(i => `<option value="${esc(i.name)}">`).join('');
@@ -39,7 +39,11 @@
   $('go').onclick = async () => {
     const it = findItem($('q').value); if (it) current = it;
     if ($('place').value && $('place').value !== 'My location') {
-      try { here = await geocode($('place').value); } catch (e) { return say('Could not find that place. Try a bigger nearby city.'); }
+      token++; // cancel any search still running for the previous place
+      $('go').disabled = true;
+      say('Finding ' + esc($('place').value) + '…');
+      try { here = await geocode($('place').value); }
+      catch (e) { $('go').disabled = false; return say('Could not find that place. Try a bigger nearby city.'); }
     }
     run();
   };
@@ -50,6 +54,7 @@
   // ---- search ----
   let token = 0;
   async function run() {
+    $('go').disabled = false;
     if (!current) return say('Pick an item above to start.');
     const it = current;
     const card = `<section class="panel item ${it.hazard === 'fire' ? 'fire' : ''}">
@@ -59,62 +64,86 @@
       <p class="hint"><a href="${esc(it.src)}" target="_blank" rel="noopener">Source</a></p></section>`;
     if (!here) { $('out').innerHTML = card + '<div class="panel">Now enter where you are, or use your location.</div>'; return; }
     const my = ++token;
-    $('out').innerHTML = card + '<div class="panel">Searching OpenStreetMap…</div>';
+    scrollPending = true;
     $('go').disabled = true;
-    // One request for everything within 30 km, then widen client-side: listed sites first, and only when
-    // fewer than 3 are listed do general recycling centres join as unconfirmed.
-    let all, savedAt = null;
-    try { all = await OTB.fetchSites(it.keys, here.lat, here.lon, 30000, undefined, true); }
-    catch (e) {
-      const snap = await loadSnapshot(it);
-      if (!snap) { $('go').disabled = false; return ($('out').innerHTML = card + '<div class="panel">The map server is busy and there is no saved copy for this area. Please try again in a moment.</div>'); }
-      ({ all, savedAt } = snap);
-    }
+    // Cache-first: public Overpass often queues requests for 30-40 s, so a saved copy (if this area has one)
+    // renders immediately and live data replaces it when it arrives.
+    const snap = await loadSnapshot(it);
+    if (my !== token) return;
+    if (snap) show(it, card, snap.all, snap.radiusM, { kind: 'cached', savedAt: snap.savedAt, refreshing: true });
+    else $('out').innerHTML = card + '<div class="panel">Searching OpenStreetMap… the public map server can take up to a minute.</div>';
+    let live = null;
+    try { live = await OTB.fetchSites(it.keys, here.lat, here.lon, 25000, undefined, true, 60000); } catch (e) {}
     $('go').disabled = false;
     if (my !== token) return;
+    if (live) show(it, card, live, 25000, { kind: 'live' });
+    else if (snap) show(it, card, snap.all, snap.radiusM, { kind: 'cached', savedAt: snap.savedAt, refreshing: false });
+    else $('out').innerHTML = card + '<div class="panel">The public map server is overloaded and there is no saved copy for this area yet. Please try again in a minute.</div>';
+  }
+
+  // Widen client-side: listed sites first; only when fewer than 3 are listed do general recycling centres
+  // join as unconfirmed.
+  function show(it, card, all, maxRadius, source) {
     let sites = [], radius = 0;
-    for (const r of [8000, 15000, 30000]) {
+    for (const r of [8000, 15000, 25000].filter(r => r <= maxRadius).concat(maxRadius < 25000 ? [maxRadius] : [])) {
       radius = r;
       const near = all.filter(s => s.km * 1000 <= r);
       const listed = near.filter(s => s.tier === 'listed');
       sites = listed.length >= 3 ? listed : near;
       if (sites.length >= 3) break;
     }
-    render(it, card, OTB.rank(sites), radius, savedAt);
+    render(it, card, OTB.rank(sites), radius, source);
   }
 
-  // Offline copy for when public Overpass servers are overloaded (see eval/snapshot.js).
+  // Saved copy built by eval/snapshot.js. Only used when the searched point is well inside its coverage.
   async function loadSnapshot(it) {
     try {
       const idx = await (await fetch('data/snapshots/index.json')).json();
       const c = idx.map(c => ({ ...c, d: OTB.haversine(here.lat, here.lon, c.lat, c.lon) })).sort((a, b) => a.d - b.d)[0];
-      if (!c || c.d > 40) return null;
+      if (!c || c.d > 10) return null;
       const s = await (await fetch('data/snapshots/' + c.file)).json();
       const all = s.elements
         .map(e => { const [type, id] = e.id.split('/'); return OTB.normalise({ ...e, type, id }, here.lat, here.lon, it.keys); })
         .filter(x => x.tier === 'listed' || x.tags.recycling_type === 'centre');
-      return { all, savedAt: s.fetchedAt };
+      // The copy covers radiusM around the city centre; only trust it out to what is still inside that circle.
+      return { all, savedAt: s.fetchedAt, radiusM: Math.max(5000, s.radiusM - c.d * 1000) };
     } catch (e) { return null; }
   }
 
-  function render(it, card, ranked, radius, savedAt) {
+  function sourceHtml(src) {
+    if (src.kind === 'live') return '<span class="src live">Live data</span>';
+    return `<span class="src cached">Saved copy from ${esc(src.savedAt.slice(0, 10))}</span>${src.refreshing ? ' <span class="meta">checking for live data…</span>' : ' <span class="meta">live server busy</span>'}`;
+  }
+
+  // Official channels for areas where the map is thin. Linked, not copied: the TNPCB directory forbids reproduction.
+  function localHelp() {
+    const inTN = here.lat > 8 && here.lat < 13.6 && here.lon > 76.2 && here.lon < 80.4;
+    const nearChennai = OTB.haversine(here.lat, here.lon, 13.0827, 80.2707) < 35;
+    if (!inTN) return '';
+    return `<div class="warn"><strong>Official options here:</strong> ${nearChennai ? 'Greater Chennai Corporation runs a domestic hazardous waste collection centre in each zone. Ask for your zone\'s centre on helpline <a href="tel:1913">1913</a> or the Namma Chennai app. ' : ''}Authorised recyclers (mostly for bulk quantities) are listed in the <a href="https://tnpcb.gov.in/PDF/Updates/Whats_New/Recyclers_Directory_2025.pdf" target="_blank" rel="noopener">TNPCB Recyclers Directory 2025</a> (PDF, 15 MB).</div>`;
+  }
+
+  function render(it, card, ranked, radius, source) {
     const shown = ranked.slice(0, 8);
     const km = radius / 1000;
     let html = card;
     if (!shown.length) {
-      html += `<div class="panel"><strong>No mapped drop-off for this within ${km} km.</strong>
+      html += `<div class="panel">${sourceHtml(source)}<br><strong>No mapped drop-off for this within ${km} km.</strong>
         <p>That usually means the map is missing data here, not that no service exists. Try your municipal body's e-waste or hazardous-waste desk, or the shop that sold you the item (many are legally required to take it back).</p>
+        ${localHelp()}
         <p class="hint">Know a place? <a href="https://www.openstreetmap.org/#map=15/${here.lat}/${here.lon}" target="_blank" rel="noopener">Add it to OpenStreetMap</a> so the next person finds it.</p></div>`;
     } else {
-      const saved = savedAt ? `<div class="warn">The live map server is busy, so this uses a saved copy of the map from ${esc(savedAt.slice(0, 10))}.</div>` : '';
       const widened = km > 8 ? `<div class="warn">Nothing close by in the map, so the search widened to ${km} km.</div>` : '';
       const sparse = shown.every(s => s.conf < 40) ? `<div class="warn"><strong>Low trust everywhere nearby.</strong> Every listing is old or thin on detail. Call before you travel${it.hazard === 'fire' ? ', and never leave a lithium battery unattended at a closed site' : ''}.</div>` : '';
-      html += `<section class="panel"><strong>${shown.length} drop-off${shown.length > 1 ? 's' : ''} near ${esc(here.label)}</strong>${saved}${widened}${sparse}<div id="map" role="img" aria-label="Map of drop-off points"></div><div id="list">`;
+      html += `<section class="panel"><strong>${shown.length} drop-off${shown.length > 1 ? 's' : ''} near ${esc(here.label)}</strong> ${sourceHtml(source)}${widened}${sparse}${shown.filter(s => s.tier === 'listed').length < 3 ? localHelp() : ''}<div id="map" role="img" aria-label="Map of drop-off points"></div><div id="list">`;
       html += shown.map((s, i) => siteHtml(s, i)).join('');
       html += `</div></section>`;
     }
     $('out').innerHTML = html;
     if (shown.length) drawMap(shown);
+    // On phones the results start below the item chips; bring them into view once per search, not on the
+    // live refresh that replaces a cached result.
+    if (scrollPending) { scrollPending = false; $('out').querySelector('section.panel:not(.item)')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   }
 
   function reasons(s) {
@@ -135,7 +164,7 @@
     const web = s.tags.website || s.tags['contact:website'];
     return `<article class="site" data-i="${i}">
       <div><h3>${i + 1}. ${esc(s.name)}</h3>
-        <div class="meta"><span class="open ${o[0]}">${o[1]}</span>${s.tags.opening_hours ? ' · ' + esc(s.tags.opening_hours) : ''} · ${s.km.toFixed(1)} km</div>
+        <div class="meta"><span class="open ${o[0]}">${o[1]}</span>${s.tags.opening_hours ? ' · ' + esc(s.tags.opening_hours) : ''}${/\bPH\s+(off|closed)/.test(s.tags.opening_hours || '') && s.open !== null ? ' (closed on public holidays)' : ''} · ${s.km.toFixed(1)} km</div>
         <div class="meta">${esc(s.tags['addr:street'] ? [s.tags['addr:housenumber'], s.tags['addr:street']].filter(Boolean).join(' ') : '')}</div>
         ${possible}
         <div class="meta">Why this score: ${esc(reasons(s))}</div>

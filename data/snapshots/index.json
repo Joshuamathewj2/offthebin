@@ -1,0 +1,50 @@
+[
+ {
+  "city": "Chennai",
+  "lat": 13.0827,
+  "lon": 80.2707,
+  "file": "chennai.json"
+ },
+ {
+  "city": "London",
+  "lat": 51.5074,
+  "lon": -0.1278,
+  "file": "london.json"
+ },
+ {
+  "city": "Berlin",
+  "lat": 52.52,
+  "lon": 13.405,
+  "file": "berlin.json"
+ },
+ {
+  "city": "Mumbai",
+  "lat": 19.076,
+  "lon": 72.8777,
+  "file": "mumbai.json"
+ },
+ {
+  "city": "Brisbane",
+  "lat": -27.4698,
+  "lon": 153.0251,
+  "file": "brisbane.json"
+ },
+ {
+  "city": "New York",
+  "lat": 40.7128,
+  "lon": -74.006,
+  "file": "new-york.json"
+ },
+ {
+  "city": "Nairobi",
+  "lat": -1.2921,
+  "lon": 36.8219,
+  "file": "nairobi.json"
+ },
+ {
+  "city": "Sao Paulo",
+  "lat": -23.5505,
+  "lon": -46.6333,
+  "file": "sao-paulo.json"
+ }
+]

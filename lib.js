@@ -7,23 +7,27 @@
   // Tier "listed": the place is tagged as accepting this material. Tier "possible" (opt-in): a general recycling
   // centre that may take it; shown as unconfirmed and always ranked below listed sites. amenity=waste_disposal is
   // deliberately excluded: in OSM it is mostly ordinary bins and skips, the exact place these items must not go.
-  function buildQuery(keys, lat, lon, radius, withPossible) {
+  // One regex key match instead of one clause per key: Overpass scans the area once, which is what keeps
+  // multi-material queries inside the timeout on a busy public server.
+  function buildQuery(keys, lat, lon, radius, withPossible, serverTimeout) {
     const a = `(around:${radius},${lat},${lon})`;
-    const parts = keys.map(k => `nwr["amenity"="recycling"]["${k}"="yes"]${a};`);
+    const re = keys.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const parts = [`nwr["amenity"="recycling"][~"^(${re})$"~"^yes$"]${a};`];
     if (withPossible) parts.push(`nwr["amenity"="recycling"]["recycling_type"="centre"]${a};`);
-    return `[out:json][timeout:25];(${parts.join('')});out center meta;`;
+    return `[out:json][timeout:${serverTimeout || 25}];(${parts.join('')});out center meta;`;
   }
 
-  async function fetchSites(keys, lat, lon, radius, fetchImpl, withPossible) {
+  async function fetchSites(keys, lat, lon, radius, fetchImpl, withPossible, timeoutMs) {
     const f = fetchImpl || fetch;
+    const ms = timeoutMs || 25000;
     let lastErr;
     for (const url of OVERPASS) {
       try {
         const r = await f(url, {
           method: 'POST',
-          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined,
           headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-          body: 'data=' + encodeURIComponent(buildQuery(keys, lat, lon, radius, withPossible)),
+          body: 'data=' + encodeURIComponent(buildQuery(keys, lat, lon, radius, withPossible, Math.ceil(ms / 1000))),
         });
         if (!r.ok) throw new Error('Overpass ' + r.status);
         return (await r.json()).elements.map(e => normalise(e, lat, lon, keys));
@@ -39,6 +43,11 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
 
+  function latest(...dates) {
+    const ok = dates.filter(d => d && !isNaN(new Date(d)));
+    return ok.length ? ok.sort((a, b) => new Date(b) - new Date(a))[0] : undefined;
+  }
+
   function normalise(e, lat, lon, keys) {
     const la = e.lat ?? e.center?.lat, lo = e.lon ?? e.center?.lon;
     const t = e.tags || {};
@@ -46,7 +55,9 @@
     return {
       id: `${e.type}/${e.id}`, lat: la, lon: lo, tags: t, tier: listed ? 'listed' : 'possible',
       name: t.name || t.operator || t.brand || 'Unnamed drop-off point',
-      timestamp: e.timestamp, version: e.version,
+      // A survey stamped with check_date is a stronger freshness signal than the last edit of any tag.
+      timestamp: latest(e.timestamp, t.check_date, t['check_date:recycling'], t.survey_date), version: e.version,
+      surveyed: !!(t.check_date || t['check_date:recycling'] || t.survey_date),
       km: haversine(lat, lon, la, lo),
     };
   }
@@ -84,6 +95,9 @@
         if (hit) return false;
         continue;
       }
+      // "PH off" only closes on public holidays, which we can't know offline; on other days it changes nothing.
+      // (The UI says "closed on public holidays" next to such hours.)
+      if (/^(PH|SH)(,(PH|SH))?\s+(off|closed)$/.test(r)) continue;
       if (/PH|SH|week|\[|sunrise|sunset|easter|"/i.test(r)) return null;
       const m = r.match(/^(?:([A-Za-z,\-]+)\s+)?((?:\d{1,2}:\d{2}-\d{1,2}:\d{2})(?:\s*,\s*\d{1,2}:\d{2}-\d{1,2}:\d{2})*|off|closed)$/);
       if (!m) return null;
@@ -123,6 +137,7 @@
     if (t.access && !['yes', 'public', 'permissive'].includes(t.access)) c -= 25;
     if (t.fixme || t.note) c -= 5;
     if ((site.version || 1) >= 3) c += 10;
+    if (site.surveyed && fr.label === 'recent') c += 10;
     if (site.tier === 'possible') c = Math.min(c, 30);
     return Math.max(0, Math.min(100, Math.round(c)));
   }
