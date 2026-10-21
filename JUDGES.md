@@ -19,6 +19,8 @@ Batteries, e-waste, tube lights, paint and oil must never go in a household bin.
 5. **Data repair loop:** *Report a problem* on every result turns a user's "this place closed" into an anonymous public OpenStreetMap Note for local mappers (no account); *Fix this listing* for mappers; a 20-target survey guide for Chennai; a script that counts contributions from live OSM.
 
 ## Impact evidence
+- **Data repaired, not just read:** comparing OSM listings with official sources found 4 errors. A "battery drop-off" that is really a vans-only transfer station, and 3 of 8 London recycling centres with wrong or missing hours (Greenford is shown open on the two days a week it is closed). Each was filed as a public OpenStreetMap Note through the same format the app uses: [#5593537](https://www.openstreetmap.org/note/5593537)-[#5593540](https://www.openstreetmap.org/note/5593540). Details: [eval/DESK_AUDIT.md](eval/DESK_AUDIT.md).
+- **Chennai, current rule built in:** GCC made four-way segregation mandatory in September 2026, with batteries and e-waste in a black bin for door-to-door collection. The app now leads with that for Chennai users.
 - **Ready, not yet run:** the Chennai field survey (20 targets, [docs/MAPPING_GUIDE_CHENNAI.md](docs/MAPPING_GUIDE_CHENNAI.md)) and the tracker that counts results from live OSM (`node eval/impact.js` → [eval/IMPACT.md](eval/IMPACT.md)). We report 0 contributions so far rather than claim any.
 - Anything added to OSM is open data: it reaches every app and map that uses OpenStreetMap, not just this one.
 

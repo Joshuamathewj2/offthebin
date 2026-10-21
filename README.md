@@ -24,7 +24,8 @@ Batteries, e-waste, tube lights, paint and oil can't go in household bins. Lithi
 |---|---|---|
 | Coverage and staleness in 8 cities | [eval/RESULTS.md](eval/RESULTS.md) (`node eval/run.js`) | done |
 | Does the trust score predict reality? 20 of 30 sites checked blind against official sources | [eval/ground-truth/RESULTS.md](eval/ground-truth/RESULTS.md) (`node eval/groundtruth.js score`) | done: weak signal (below) |
-| Drop-off points added to OSM in Chennai, verified from live OSM | [eval/IMPACT.md](eval/IMPACT.md) (`node eval/impact.js`) | tracker ready; field survey starts after the hackathon |
+| Desk audit: OSM tags vs official sources; every error filed as a public OSM Note | [eval/DESK_AUDIT.md](eval/DESK_AUDIT.md) | done: 4 errors found and reported (3 of 8 London centres had wrong or missing hours) |
+| Reports and fixes counted from live OSM | [eval/IMPACT.md](eval/IMPACT.md) (`node eval/impact.js`) | 4 notes filed; Chennai on-site survey still to do |
 | Unit tests (hours parser, scoring, ranking, query) | `node --test` | 10/10 passing |
 
 ## Run it

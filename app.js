@@ -127,7 +127,7 @@
     const inTN = here.lat > 8 && here.lat < 13.6 && here.lon > 76.2 && here.lon < 80.4;
     const nearChennai = OTB.haversine(here.lat, here.lon, 13.0827, 80.2707) < 35;
     if (!inTN) return '';
-    return `<div class="warn"><strong>Official options here:</strong> ${nearChennai ? 'Greater Chennai Corporation runs a domestic hazardous waste collection centre in each zone. Ask for your zone\'s centre on helpline <a href="tel:1913">1913</a> or the Namma Chennai app. ' : ''}Authorised recyclers (mostly for bulk quantities) are listed in the <a href="https://tnpcb.gov.in/PDF/Updates/Whats_New/Recyclers_Directory_2025.pdf" target="_blank" rel="noopener">TNPCB Recyclers Directory 2025</a> (PDF, 15 MB).</div>`;
+    return `<div class="warn"><strong>Official options here:</strong> ${nearChennai ? 'Since September 2026 Greater Chennai Corporation requires four-way segregation: batteries, bulbs and e-waste go in a separate <strong>black bin</strong> for the door-to-door conservancy worker, never with wet or dry waste (<a href="https://english.punjabkesari.com/india/chennai-corporation-makes-four-way-waste-segregation-mandatorywarns-of-penalties" target="_blank" rel="noopener">report, 12 Sep 2026</a>). For larger items, ask for your zone\'s domestic hazardous waste collection centre on helpline <a href="tel:1913">1913</a> or the Namma Chennai app. ' : ''}Authorised recyclers (mostly for bulk quantities) are listed in the <a href="https://tnpcb.gov.in/PDF/Updates/Whats_New/Recyclers_Directory_2025.pdf" target="_blank" rel="noopener">TNPCB Recyclers Directory 2025</a> (PDF, 15 MB).</div>`;
   }
 
   function render(it, card, ranked, radius, source) {
